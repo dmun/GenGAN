@@ -10,10 +10,17 @@ import random
 
 smallValue = 1e-6
 
+def get_device():
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
+    return device
 
 def set_seed(seed_val):
     torch.manual_seed(seed_val)
-    torch.cuda.manual_seed(seed_val)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
     random.seed(seed_val)

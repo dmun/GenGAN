@@ -15,6 +15,7 @@ from librosa.core import load
 import soundfile as sf
 from librosa.util import normalize
 from hydra import utils
+from utils import get_device
 
 
 def parse_args():
@@ -253,11 +254,10 @@ if __name__ == "__main__":
 	args = parse_args()
 	seed_val = 123
 	torch.manual_seed(seed_val)
-	torch.cuda.manual_seed(seed_val)
 	torch.backends.cudnn.deterministic = True
 	torch.backends.cudnn.benchmark = False
 	random.seed(seed_val)
-	device = 'cuda' if torch.cuda.is_available() else 'cpu'
+	device = get_device()
 	print('Using {} device'.format(device))
 
 	#######################

@@ -19,10 +19,11 @@ from pathlib import Path
 import random
 import pdb
 import math
+from utils import get_device
 
 
-LongTensor = torch.cuda.LongTensor
-FloatTensor = torch.cuda.FloatTensor
+LongTensor = torch.LongTensor
+FloatTensor = torch.FloatTensor
 
 
 def parse_args():
@@ -67,7 +68,7 @@ def main():
     print('******Experiment NAME*******\n', experiment_name)
 
     num_runs = args.num_runs
-    device = 'cuda:' + str(args.device)
+    device = get_device()
     log_dir = os.path.join(root, 'logs')
     experiment_dir = os.path.join(log_dir, experiment_name)
 

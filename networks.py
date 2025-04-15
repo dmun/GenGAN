@@ -12,6 +12,7 @@ import torch.utils.data
 import torchvision.datasets as dset
 import torchvision.transforms as transforms
 import torchvision.utils as vutils
+from torch.nn.utils.parametrizations import weight_norm
 import numpy as np
 import librosa
 import soundfile as sf
@@ -21,10 +22,10 @@ from torch.nn.functional import relu, max_pool1d, sigmoid, log_softmax
 
 def double_conv(channels_in, channels_out, kernel_size):
     return nn.Sequential(
-        nn.utils.weight_norm(nn.Conv2d(channels_in, channels_out, kernel_size, padding=1)),
+        weight_norm(nn.Conv2d(channels_in, channels_out, kernel_size, padding=1)),
         nn.BatchNorm2d(channels_out),
         nn.ReLU(),
-        nn.utils.weight_norm(nn.Conv2d(channels_out, channels_out, kernel_size, padding=1)),
+        weight_norm(nn.Conv2d(channels_out, channels_out, kernel_size, padding=1)),
         nn.BatchNorm2d(channels_out),
         nn.ReLU()
     )

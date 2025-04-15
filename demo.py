@@ -18,8 +18,8 @@ import pdb
 import math
 
 
-LongTensor = torch.cuda.LongTensor
-FloatTensor = torch.cuda.FloatTensor
+LongTensor = torch.LongTensor
+FloatTensor = torch.FloatTensor
 
 
 def parse_args():
@@ -36,8 +36,8 @@ def parse_args():
     parser.add_argument("--num_runs", type = int, default = 1)
     parser.add_argument("--noise_dim", type=int, default=65)
     parser.add_argument("--max_duration", type=int, default=16.7)
-    parser.add_argument("--path_to_audio", type=int, default='/audio/xyz.wav')
-    parser.add_argument("--path_to_models", type=int, default='/models')
+    parser.add_argument("--path_to_audio", type=str, default='/audio/xyz.wav')
+    parser.add_argument("--path_to_models", type=str, default='/models')
     args = parser.parse_args()
     return args
 
@@ -56,7 +56,7 @@ def load_wav_to_torch(full_path, max_duration):
 def main():
     args = parse_args()
     root = Path(os.getcwd())
-    device = 'cuda:' + str(args.device)
+    device = 'mps'
 
     # hyper parameters
     noise_dim = args.noise_dim
@@ -69,7 +69,7 @@ def main():
     # Load MelGAN vocoder
     fft = Audio2Mel(sampling_rate=args.sampling_rate)
     Mel2Audio = MelGAN_Generator(args.n_mel_channels, args.ngf, args.n_residual_layers).to(device)
-    Mel2Audio.load_state_dict(torch.load(args.path_to_models + '/multi_speaker.pt'))
+    Mel2Audio.load_state_dict(torch.load(args.path_to_models + '/multi_speaker.pt', map_location=device))
 
     run_dir = os.path.join(root, 'audio_')
     if not os.path.exists(run_dir):
@@ -89,7 +89,7 @@ def main():
     training_objects.sort(key=lambda x: x[0])
 
     # Load from checkpoint
-    netG.load_state_dict(torch.load(args.path_to_models + '/netG_epoch_25.pt'))
+    netG.load_state_dict(torch.load(args.path_to_models + '/netG_epoch_25.pt', map_location=device))
 
     print("GenGAN synthesis initiated")
     netG.eval()
