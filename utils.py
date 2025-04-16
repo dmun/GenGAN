@@ -10,6 +10,7 @@ import random
 
 smallValue = 1e-6
 
+
 def get_device():
     if torch.cuda.is_available():
         device = torch.device("cuda")
@@ -17,7 +18,9 @@ def get_device():
         device = torch.device("mps")
     else:
         device = torch.device("cpu")
+    print("Using device:", device)
     return device
+
 
 def set_seed(seed_val):
     torch.manual_seed(seed_val)
@@ -34,9 +37,9 @@ def preprocess_spectrograms(spectrograms):
 
     """
     # Normalize to zero mean unit variance, clip above 3 std and rescale to [-1,1]
-    means = torch.mean(spectrograms, dim = (1,2), keepdim = True)
-    stds = torch.std(spectrograms, dim = (1,2), keepdim = True)
-    normalized_spectrograms = (spectrograms - means)/(3*stds + smallValue)
+    means = torch.mean(spectrograms, dim=(1, 2), keepdim=True)
+    stds = torch.std(spectrograms, dim=(1, 2), keepdim=True)
+    normalized_spectrograms = (spectrograms - means) / (3 * stds + smallValue)
     clipped_spectrograms = torch.clamp(normalized_spectrograms, -1, 1)
 
     return clipped_spectrograms, means, stds

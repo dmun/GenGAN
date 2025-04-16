@@ -1,3 +1,4 @@
+absl-py==2.2.2
 antlr4-python3-runtime==4.9.3
 audioread==3.0.1
 certifi==2025.1.31
@@ -9,6 +10,7 @@ decorator==5.2.1
 filelock==3.18.0
 fonttools==4.57.0
 fsspec==2025.3.2
+grpcio==1.71.0
 hydra-core==1.3.2
 idna==3.10
 Jinja2==3.1.6
@@ -17,6 +19,7 @@ kiwisolver==1.4.8
 lazy_loader==0.4
 librosa==0.11.0
 llvmlite==0.44.0
+Markdown==3.8
 MarkupSafe==3.0.2
 matplotlib==3.10.1
 mpmath==1.3.0
@@ -26,12 +29,15 @@ numba==0.61.2
 numpy==2.2.4
 omegaconf==2.3.0
 packaging==24.2
+pandas==2.2.3
 pillow==11.2.1
 platformdirs==4.3.7
 pooch==1.8.2
+protobuf==6.30.2
 pycparser==2.22
 pyparsing==3.2.3
 python-dateutil==2.9.0.post0
+pytz==2025.2
 PyYAML==6.0.2
 requests==2.32.3
 scikit-learn==1.6.1
@@ -41,9 +47,13 @@ six==1.17.0
 soundfile==0.13.1
 soxr==0.5.0.post1
 sympy==1.13.1
+tensorboard==2.19.0
+tensorboard-data-server==0.7.2
 threadpoolctl==3.6.0
 torch==2.6.0
 torchvision==0.21.0
 tqdm==4.67.1
 typing_extensions==4.13.2
+tzdata==2025.2
 urllib3==2.4.0
+Werkzeug==3.1.3

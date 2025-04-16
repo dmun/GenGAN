@@ -15,14 +15,13 @@ from librosa.util import normalize
 import random
 import pdb
 
-
 class LibriDataset(Dataset):
     def __init__(self, root, hop_length, sr, set, sample_frames):
         self.root = Path(root)
         self.hop_length = hop_length
         self.sample_frames = sample_frames
         self.set = set
-        self.segment_length = int(16.7*sr)
+        self.segment_length = int(16.7 * sr)
 
         with open(self.root / Path("libri_" + str(set) + "_speakers.json")) as file:
             self.speakers = sorted(json.load(file))
@@ -32,7 +31,8 @@ class LibriDataset(Dataset):
         with open(self.root / Path("libri_" + str(set) + "_preprocess.json")) as file:
             metadata = json.load(file)
             self.metadata = [
-                Path(in_path) for in_path, _, duration in metadata
+                Path(in_path)
+                for in_path, _, duration in metadata
                 if duration > min_duration
             ]
 

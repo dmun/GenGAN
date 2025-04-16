@@ -275,7 +275,7 @@ if __name__ == "__main__":
 	)
 
 	# train_loader = DataLoader(train_set, batch_size=args.batch_size, num_workers=1, drop_last=True)
-	test_loader = DataLoader(test_set, batch_size=128)
+	test_loader = DataLoader(test_set, batch_size=args.batch_size)
 
 	model = GenderNet(16, 5).to(device)
 	print(model)
