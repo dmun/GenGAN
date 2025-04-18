@@ -1,42 +1,44 @@
-from tqdm import tqdm
-import dataset
-import librosa
-from torch.utils.data import DataLoader, random_split
-import torch
-import torch.nn.functional as F
-from utils import *
-import torchvision.models as models
-from torch.utils.tensorboard import SummaryWriter
 import argparse
-import yaml
-from pathlib import Path
-import time
-from networks import UNetFilter, AlexNet_Discriminator
-from torch.autograd import Variable
 import glob
-from modules import MelGAN_Generator, Audio2Mel
-from pathlib import Path
-import random
-import pdb
 import math
-from utils import get_device
 import os
+import time
+from pathlib import Path
+import numpy as np
 
+import torch
+import yaml
+from torch.autograd import Variable
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+
+import dataset
+from modules import Audio2Mel, MelGAN_Generator
+from networks import AlexNet_Discriminator, UNetFilter
+from utils import *
+from utils import get_device
+
+from torch.nn.utils.rnn import pad_sequence
 
 LongTensor = torch.LongTensor
 FloatTensor = torch.FloatTensor
 
 
-def pad_collate_fn(batch):
-    inputs, labels, genders, _ = zip(*batch)
-    max_length = max(input.shape[0] for input in inputs)
-    # Pad to the next multiple of 16
-    padded_length = ((max_length + 15) // 16) * 16
-    padded_inputs = [F.pad(input, (0, padded_length - input.shape[0])) for input in inputs]
-    inputs_tensor = torch.stack(padded_inputs)
-    labels_tensor = torch.tensor(labels)
-    genders_tensor = torch.stack(genders)
-    return inputs_tensor, labels_tensor, genders_tensor
+def _collate_fn(batch):
+    return torch.utils.data.default_collate(batch)
+
+
+def collate_fn(batch):
+    audios, speakers, genders, utterances = zip(*batch)
+
+    # Pad audios to the longest in the batch
+    audios = pad_sequence(audios, batch_first=True)
+
+    # Stack speaker & gender as tensors
+    speakers = torch.tensor(speakers, dtype=torch.long)
+    genders = torch.stack(genders)
+
+    return audios,  genders
 
 
 def parse_args():
@@ -115,7 +117,7 @@ def main():
         num_workers=0,
         pin_memory=True,
         drop_last=True,
-        # collate_fn=pad_collate_fn,
+        collate_fn=collate_fn,
     )
 
     # dataset2 = dataset.LibriDataset(
@@ -222,7 +224,7 @@ def main():
             epoch_start = time.time()
             netG.train()
             netD.train()
-            for i, (x, _, gender) in tqdm(enumerate(train_loader)):
+            for i, (x, gender) in tqdm(enumerate(train_loader)):
                 gender = gender.to(device)
                 x = torch.unsqueeze(x, 1)
                 spectrograms = fft(x).detach()
@@ -277,7 +279,7 @@ def main():
                     real_pred_secret, gender.long().to(device)
                 ).to(device)
                 D_genderless_loss = adversarial_loss_rf(
-                    fake_pred_secret, gen_secret
+                    fake_pred_secret, gen_secret.long()
                 ).to(device)
 
                 D_real_loss_accum += D_real_loss.item()

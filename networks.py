@@ -2,6 +2,7 @@ import torchvision.models as models
 import torch.nn as nn
 from torch.nn.functional import log_softmax
 from torchvision.models.alexnet import AlexNet
+import torchvision.transforms.functional as TF
 import argparse
 import os
 import random
@@ -104,21 +105,22 @@ class UNetFilter(nn.Module):
 
         conv5_down = torch.cat((conv5_down, noise), dim=1)
         conv5_up = F.interpolate(conv5_down, scale_factor=2, mode="nearest")
+        conv5_up = TF.crop(conv5_up, 0, 0, conv4_down.shape[2], conv4_down.shape[3])
         conv5_up = torch.cat((conv4_down, conv5_up), dim=1)
 
         conv5_up = self.dconv_up5(conv5_up)
         conv4_up = F.interpolate(conv5_up, scale_factor=2, mode="nearest")
-
+        conv4_up = TF.crop(conv4_up, 0, 0, conv3_down.shape[2], conv3_down.shape[3])
         conv4_up = torch.cat((conv3_down, conv4_up), dim=1)
 
         conv4_up = self.dconv_up4(conv4_up)
         conv3_up = F.interpolate(conv4_up, scale_factor=2, mode="nearest")
-        conv3_up = self.pad(conv3_up)
+        conv3_up = TF.crop(conv3_up, 0, 0, conv2_down.shape[2], conv2_down.shape[3])
         conv3_up = torch.cat((conv2_down, conv3_up), dim=1)
 
         conv3_up = self.dconv_up3(conv3_up)
         conv2_up = F.interpolate(conv3_up, scale_factor=2, mode="nearest")
-        conv2_up = self.pad(conv2_up)
+        conv2_up = TF.crop(conv2_up, 0, 0, conv1_down.shape[2], conv1_down.shape[3])
         conv2_up = torch.cat((conv1_down, conv2_up), dim=1)
 
         conv2_up = self.dconv_up2(conv2_up)
