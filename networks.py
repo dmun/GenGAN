@@ -73,7 +73,7 @@ class UNetFilter(nn.Module):
         self.pool_down4 = nn.MaxPool2d(2, stride=2)
 
         self.dconv_down5 = double_conv(chs[3], chs[4], kernel_size)
-        self.dconv_up5 = double_conv(chs[4] + chs[3] + 1, chs[3], kernel_size)
+        self.dconv_up5 = double_conv(chs[4] + chs[3], chs[3], kernel_size)
 
         self.dconv_up4 = double_conv(chs[3] + chs[2], chs[2], kernel_size)
 
@@ -100,10 +100,12 @@ class UNetFilter(nn.Module):
 
         conv5_down = self.dconv_down5(pool4)
 
-        z = z.reshape(x.shape[0], 1, 5, conv5_down.shape[-1])
-        noise = self.project_noise(z)
+        # print("conv5_down.shape:", conv5_down.shape)
+        # print("noise", z.shape)
+        # z = z.reshape(x.shape[0], 1, 5, conv5_down.shape[-1])
+        # noise = self.project_noise(z)
 
-        conv5_down = torch.cat((conv5_down, noise), dim=1)
+        # conv5_down = torch.cat((conv5_down, noise), dim=1)
         conv5_up = F.interpolate(conv5_down, scale_factor=2, mode="nearest")
         conv5_up = TF.crop(conv5_up, 0, 0, conv4_down.shape[2], conv4_down.shape[3])
         conv5_up = torch.cat((conv4_down, conv5_up), dim=1)
