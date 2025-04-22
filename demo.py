@@ -103,10 +103,11 @@ def main():
     print("GenGAN synthesis initiated")
     netG.eval()
     x, dur = load_wav_to_torch(audio_path, max_duration)
+    x = x.to(device)
     x = torch.unsqueeze(x, 1)
-    spectrograms = fft(x.reshape(1, x.size(0))).detach()
+    spectrograms = fft(x.reshape(1, x.size(0)))
     spectrograms, means, stds = preprocess_spectrograms(spectrograms)
-    spectrograms = torch.unsqueeze(spectrograms, 1).to(device)
+    spectrograms = torch.unsqueeze(spectrograms, 1)
 
     z = torch.randn(spectrograms.shape[0], noise_dim * 5).to(device)
     gen_secret = Variable(

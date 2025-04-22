@@ -114,7 +114,7 @@ def main():
         dataset1,
         batch_size=batch_train,
         shuffle=True,
-        num_workers=0,
+        num_workers=32,
         pin_memory=True,
         drop_last=True,
         collate_fn=collate_fn,
@@ -136,7 +136,7 @@ def main():
     n_train = dataset1.__len__()
 
     # Load MelGAN vocoder
-    fft = Audio2Mel(sampling_rate=args.sampling_rate)
+    fft = Audio2Mel(sampling_rate=args.sampling_rate, device=device)
     Mel2Audio = MelGAN_Generator(
         args.n_mel_channels, args.ngf, args.n_residual_layers
     ).to(device)
@@ -226,17 +226,18 @@ def main():
             netD.train()
             for i, (x, gender) in tqdm(enumerate(train_loader)):
                 gender = gender.to(device)
+                x = x.to(device)
                 x = torch.unsqueeze(x, 1)
-                spectrograms = fft(x).detach()
+                spectrograms = fft(x)
                 spectrograms, means, stds = preprocess_spectrograms(spectrograms)
-                spectrograms = torch.unsqueeze(spectrograms, 1).to(device)
+                spectrograms = torch.unsqueeze(spectrograms, 1)
 
                 # ------------------------
                 # Train Generator (Real/Fake)
                 # ------------------------
                 optG.zero_grad()
 
-                z2 = torch.randn(spectrograms.shape[0], noise_dim * 5).to(device)
+                z2 = torch.randn(spectrograms.shape[0], noise_dim * 5, device=device)
 
                 # randomly sample from synthetic gender distribution
                 gen_secret = Variable(
@@ -256,7 +257,7 @@ def main():
                 G_distortion_loss_accum += generator_distortion_loss.item()
                 # La loss predicted gender close to 0.5
                 generator_adversary_loss = adversarial_loss(
-                    pred_secret, gender.long().to(device)
+                    pred_secret, gender.long()
                 )
 
                 G_adversary_loss_accum += generator_adversary_loss.item()
