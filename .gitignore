@@ -1,7 +1,9 @@
 venv
+.venv
 audio*
 __pycache__
 LibriSpeech
 train-clean-100
 test-clean
-.aider*
+libri_*_preprocess.json
+logs

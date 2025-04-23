@@ -1,24 +1,12 @@
 import torchvision.models as models
 import torch.nn as nn
-from torch.nn.functional import log_softmax
-from torchvision.models.alexnet import AlexNet
 import torchvision.transforms.functional as TF
-import argparse
-import os
-import random
 import torch
-import torch.optim as optim
 import torch.nn.functional as F
 import torch.utils.data
-import torchvision.datasets as dset
-import torchvision.transforms as transforms
-import torchvision.utils as vutils
 from torch.nn.utils.parametrizations import weight_norm
-import numpy as np
-import librosa
-import soundfile as sf
+import math
 
-from torch.nn.functional import relu, max_pool1d, sigmoid, log_softmax
 
 
 def double_conv(channels_in, channels_out, kernel_size):
@@ -55,6 +43,7 @@ class UNetFilter(nn.Module):
         self.embed_condition = nn.Embedding(nb_classes, embedding_dim)  # (not used)
         # noise projection layer
         self.project_noise = nn.Linear(noise_dim, noise_dim)
+        # self.project_noise = nn.Linear(noise_dim, 5 * image_width // 16) 
         # condition projection layer (not used)
         self.project_cond = nn.Linear(
             embedding_dim, image_width // 16 * image_height // 16
@@ -73,7 +62,7 @@ class UNetFilter(nn.Module):
         self.pool_down4 = nn.MaxPool2d(2, stride=2)
 
         self.dconv_down5 = double_conv(chs[3], chs[4], kernel_size)
-        self.dconv_up5 = double_conv(chs[4] + chs[3], chs[3], kernel_size)
+        self.dconv_up5 = double_conv(chs[4] + chs[3] + 1, chs[3], kernel_size)
 
         self.dconv_up4 = double_conv(chs[3] + chs[2], chs[2], kernel_size)
 
@@ -102,10 +91,10 @@ class UNetFilter(nn.Module):
 
         # print("conv5_down.shape:", conv5_down.shape)
         # print("noise", z.shape)
-        # z = z.reshape(x.shape[0], 1, 5, conv5_down.shape[-1])
-        # noise = self.project_noise(z)
+        z = z.reshape(x.shape[0], 1, 5, conv5_down.shape[-1])
+        noise = self.project_noise(z)
 
-        # conv5_down = torch.cat((conv5_down, noise), dim=1)
+        conv5_down = torch.cat((conv5_down, noise), dim=1)
         conv5_up = F.interpolate(conv5_down, scale_factor=2, mode="nearest")
         conv5_up = TF.crop(conv5_up, 0, 0, conv4_down.shape[2], conv4_down.shape[3])
         conv5_up = torch.cat((conv4_down, conv5_up), dim=1)
@@ -165,3 +154,94 @@ def AlexNet_Discriminator(num_classes):
     )
 
     return model
+
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, max_len=10000):
+        super().__init__()
+        
+        # Create positional encoding matrix
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        
+        # Calculate positional encodings
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0)
+        
+        # Register as buffer (won't be updated during backprop but saved in state_dict)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        # Add positional encoding to input
+        return x + self.pe[:, :x.size(1)]
+
+class TransformerDiscriminator(nn.Module):
+    def __init__(self, num_classes, d_model=128, nhead=4, num_layers=3, dim_feedforward=512, dropout=0.1):
+        super().__init__()
+        
+        # Initial convolutional layer to process spectrograms
+        # Input shape: [batch_size, 1, height, width]
+        self.conv_embed = nn.Sequential(
+            nn.Conv2d(1, d_model//2, kernel_size=4, stride=4, padding=0),
+            nn.BatchNorm2d(d_model//2),
+            nn.ReLU(),
+            nn.Conv2d(d_model//2, d_model, kernel_size=4, stride=4, padding=0),
+            nn.BatchNorm2d(d_model),
+            nn.ReLU()
+        )
+        
+        # Positional encoding layer
+        self.pos_encoder = PositionalEncoding(d_model)
+        
+        # Transformer encoder layer
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=d_model,
+            nhead=nhead,
+            dim_feedforward=dim_feedforward,
+            dropout=dropout,
+            batch_first=True,
+            norm_first=True,
+        )
+        
+        # Stack of transformer encoder layers
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+        
+        # Classification head
+        # self.classifier = nn.Sequential(
+        #     nn.Linear(d_model, dim_feedforward),
+        #     nn.ReLU(),
+        #     nn.Dropout(dropout),
+        #     nn.Linear(dim_feedforward, dim_feedforward // 2),
+        #     nn.ReLU(),
+        #     nn.Dropout(dropout),
+        #     nn.Linear(dim_feedforward // 2, num_classes)
+        # )
+        self.classifier = nn.Sequential(
+            nn.Linear(d_model, dim_feedforward),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(dim_feedforward, num_classes)
+        )
+        
+    def forward(self, x):
+        # Pass through CNN layers
+        x = self.conv_embed(x)  # [batch_size, d_model, h', w']
+        
+        # Reshape for transformer
+        batch_size, d_model, h, w = x.shape
+        x = x.permute(0, 2, 3, 1)  # [batch_size, h', w', d_model]
+        x = x.reshape(batch_size, h * w, d_model)  # [batch_size, seq_len, d_model]
+        
+        # Add positional encoding
+        x = self.pos_encoder(x)
+        
+        # Pass through transformer
+        x = self.transformer_encoder(x)
+        
+        # Global average pooling over sequence dimension
+        x = x.mean(dim=1)
+        
+        x = self.classifier(x)
+        
+        return x

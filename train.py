@@ -14,7 +14,7 @@ from tqdm import tqdm
 
 import dataset
 from modules import Audio2Mel, MelGAN_Generator
-from networks import AlexNet_Discriminator, UNetFilter
+from networks import AlexNet_Discriminator, UNetFilter, TransformerDiscriminator, PositionalEncoding
 from utils import *
 from utils import get_device
 
@@ -38,7 +38,7 @@ def collate_fn(batch):
     speakers = torch.tensor(speakers, dtype=torch.long)
     genders = torch.stack(genders)
 
-    return audios,  genders
+    return audios, genders
 
 
 def parse_args():
@@ -88,9 +88,7 @@ def main():
 
     print("Resume Experiment?", args.resume_trial)
     if os.path.exists(experiment_dir):
-        print(
-            "Experiment with this name already exists, use --resume_trial to continue."
-        )
+        print("Experiment with this name already exists, use --resume_trial to continue.")
     else:
         os.mkdir(experiment_dir)
 
@@ -137,12 +135,8 @@ def main():
 
     # Load MelGAN vocoder
     fft = Audio2Mel(sampling_rate=args.sampling_rate, device=device)
-    Mel2Audio = MelGAN_Generator(
-        args.n_mel_channels, args.ngf, args.n_residual_layers
-    ).to(device)
-    Mel2Audio.load_state_dict(
-        torch.load("models/multi_speaker.pt", map_location=device)
-    )
+    Mel2Audio = MelGAN_Generator(args.n_mel_channels, args.ngf, args.n_residual_layers).to(device)
+    Mel2Audio.load_state_dict(torch.load("models/multi_speaker.pt", map_location=device))
 
     # Loss functions
     distortion_loss = nn.MSELoss()
@@ -182,7 +176,15 @@ def main():
             embedding_dim=16,
             use_cond=False,
         ).to(device)
-        netD = AlexNet_Discriminator(num_genders + 1).to(device)
+        # netD = AlexNet_Discriminator(num_genders + 1).to(device)
+        netD = TransformerDiscriminator(
+            num_classes=num_genders + 1,
+            d_model=256,  # Embedding dimension
+            nhead=8,  # Number of attention heads
+            num_layers=6,  # Number of transformer layers
+            dim_feedforward=1024,  # Dimension of feedforward network
+            dropout=0.1,  # Dropout rate
+        ).to(device)
 
         # Optimizers
         optG = torch.optim.Adam(netG.parameters(), args.G_lr, betas=(0.5, 0.99))
@@ -200,17 +202,9 @@ def main():
         start_epoch = 0
         if args.resume_trial:
             start_epoch = 100
-            print(
-                "Resuming experiment {} from checkpoint, {} epochs completed.".format(
-                    args.trial, start_epoch
-                )
-            )
-            netG.load_state_dict(
-                torch.load(os.path.join(checkpoint_dir, "netG_latest_epoch_20.pt"))
-            )
-            netD.load_state_dict(
-                torch.load(os.path.join(checkpoint_dir, "netD_latest_epoch_20.pt"))
-            )
+            print("Resuming experiment {} from checkpoint, {} epochs completed.".format(args.trial, start_epoch))
+            netG.load_state_dict(torch.load(os.path.join(checkpoint_dir, "netG_latest_epoch_20.pt")))
+            netD.load_state_dict(torch.load(os.path.join(checkpoint_dir, "netD_latest_epoch_20.pt")))
 
         print("GAN training initiated, {} epochs".format(args.epochs))
         script_start = time.time()
@@ -240,9 +234,7 @@ def main():
                 z2 = torch.randn(spectrograms.shape[0], noise_dim * 5, device=device)
 
                 # randomly sample from synthetic gender distribution
-                gen_secret = Variable(
-                    LongTensor(np.random.choice([1.0], spectrograms.shape[0]))
-                ).to(device)
+                gen_secret = Variable(LongTensor(np.random.choice([1.0], spectrograms.shape[0]))).to(device)
                 gen_secret = gen_secret * np.random.normal(0.5, math.sqrt(0.05))
                 # pass M' + Z2 + Y_N gender to Generator and get M'
                 # -----------------------------------------------------------------
@@ -256,9 +248,7 @@ def main():
 
                 G_distortion_loss_accum += generator_distortion_loss.item()
                 # La loss predicted gender close to 0.5
-                generator_adversary_loss = adversarial_loss(
-                    pred_secret, gender.long()
-                )
+                generator_adversary_loss = adversarial_loss(pred_secret, gender.long())
 
                 G_adversary_loss_accum += generator_adversary_loss.item()
 
@@ -276,12 +266,8 @@ def main():
 
                 fake_pred_secret = pred_secret.detach()
 
-                D_real_loss = adversarial_loss_rf(
-                    real_pred_secret, gender.long().to(device)
-                ).to(device)
-                D_genderless_loss = adversarial_loss_rf(
-                    fake_pred_secret, gen_secret.long()
-                ).to(device)
+                D_real_loss = adversarial_loss_rf(real_pred_secret, gender.long().to(device)).to(device)
+                D_genderless_loss = adversarial_loss_rf(fake_pred_secret, gen_secret.long()).to(device)
 
                 D_real_loss_accum += D_real_loss.item()
                 D_fake_loss_accum += D_genderless_loss.item()
@@ -304,29 +290,19 @@ def main():
                         )
                     )
 
-            print(
-                "\n__________________________________________________________________________"
-            )
-            print(
-                "Epoch {} completed | Time: {:5.2f} s ".format(
-                    epoch + 1, time.time() - epoch_start
-                )
-            )
+            print("\n__________________________________________________________________________")
+            print("Epoch {} completed | Time: {:5.2f} s ".format(epoch + 1, time.time() - epoch_start))
 
             if (epoch + 1) % args.checkpoint_interval == 0:
                 save_epoch = epoch + 1
-                old_checkpoints = sorted(
-                    glob.glob(os.path.join(checkpoint_dir, "*latest*"))
-                )
+                old_checkpoints = sorted(glob.glob(os.path.join(checkpoint_dir, "*latest*")))
                 if old_checkpoints:
                     for i, _ in enumerate(old_checkpoints):
                         os.remove(old_checkpoints[i])
                 for name, object in training_objects:
                     torch.save(
                         object.state_dict(),
-                        os.path.join(
-                            checkpoint_dir, name + "_epoch_{}.pt".format(save_epoch)
-                        ),
+                        os.path.join(checkpoint_dir, name + "_epoch_{}.pt".format(save_epoch)),
                     )
                     torch.save(
                         object.state_dict(),
@@ -338,9 +314,7 @@ def main():
             print("Total time: ", script_start)
 
         print("Run number {} completed.".format(run + 1))
-        print(
-            "__________________________________________________________________________"
-        )
+        print("__________________________________________________________________________")
 
 
 if __name__ == "__main__":

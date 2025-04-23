@@ -42,9 +42,7 @@ def load_wav_to_torch(full_path, max_duration):
     audio = torch.from_numpy(audio).float()
     # utterances of segment_length
     if audio.size(0) <= max_duration * sampling_rate:
-        audio = F.pad(
-            audio, (0, int(max_duration * sampling_rate) - audio.size(0)), "constant"
-        ).data
+        audio = F.pad(audio, (0, int(max_duration * sampling_rate) - audio.size(0)), "constant").data
     return audio, duration
 
 
@@ -63,12 +61,8 @@ def main():
 
     # Load MelGAN vocoder
     fft = Audio2Mel(sampling_rate=args.sampling_rate)
-    Mel2Audio = MelGAN_Generator(
-        args.n_mel_channels, args.ngf, args.n_residual_layers
-    ).to(device)
-    Mel2Audio.load_state_dict(
-        torch.load(args.path_to_models + "/multi_speaker.pt", map_location=device)
-    )
+    Mel2Audio = MelGAN_Generator(args.n_mel_channels, args.ngf, args.n_residual_layers).to(device)
+    Mel2Audio.load_state_dict(torch.load(args.path_to_models + "/multi_speaker.pt", map_location=device))
 
     run_dir = os.path.join(root, "audio_")
     if not os.path.exists(run_dir):
@@ -96,9 +90,7 @@ def main():
     training_objects.sort(key=lambda x: x[0])
 
     # Load from checkpoint
-    netG.load_state_dict(
-        torch.load(args.path_to_models + "/netG_epoch_25.pt", map_location=device)
-    )
+    netG.load_state_dict(torch.load(args.path_to_models + "/netG_epoch_25.pt", map_location=device))
 
     print("GenGAN synthesis initiated")
     netG.eval()
@@ -110,17 +102,13 @@ def main():
     spectrograms = torch.unsqueeze(spectrograms, 1)
 
     z = torch.randn(spectrograms.shape[0], noise_dim * 5).to(device)
-    gen_secret = Variable(
-        LongTensor(np.random.choice([1.0], spectrograms.shape[0]))
-    ).to(device)
+    gen_secret = Variable(LongTensor(np.random.choice([1.0], spectrograms.shape[0]))).to(device)
     y_n = gen_secret * np.random.normal(0.5, math.sqrt(0.05))
     # Input to Generator
     generated_neutral = netG(spectrograms, z, y_n).detach()
 
     # spectrogram inversion
-    generated_neutral = torch.squeeze(generated_neutral, 1).to(device) * 3 * stds.to(
-        device
-    ) + means.to(device)
+    generated_neutral = torch.squeeze(generated_neutral, 1).to(device) * 3 * stds.to(device) + means.to(device)
     inverted_neutral = Mel2Audio(generated_neutral).squeeze().detach().cpu()
     print("Saving audio..")
     f_name_neutral_audio = os.path.join(run_dir, audio_file + "_transformed.wav")
