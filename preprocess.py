@@ -31,5 +31,5 @@ def generate_preprocess_json(dataset_path, output_path, set_name="train"):
     print(f"Generated {preprocess_json_path}")
 
 
-generate_preprocess_json("../train-clean-100", "./data_files", "train")
-generate_preprocess_json("../test-clean", "./data_files", "test")
+generate_preprocess_json("./train-clean-100", "./data_files", "train")
+generate_preprocess_json("./test-clean", "./data_files", "test")

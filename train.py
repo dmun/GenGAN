@@ -16,7 +16,7 @@ import dataset
 from modules import Audio2Mel, MelGAN_Generator
 from networks import AlexNet_Discriminator, UNetFilter, TransformerDiscriminator, PositionalEncoding
 from utils import *
-from utils import get_device
+from utils import get_device, preprocess_spectrograms
 
 from torch.nn.utils.rnn import pad_sequence
 
@@ -176,15 +176,15 @@ def main():
             embedding_dim=16,
             use_cond=False,
         ).to(device)
-        # netD = AlexNet_Discriminator(num_genders + 1).to(device)
-        netD = TransformerDiscriminator(
-            num_classes=num_genders + 1,
-            d_model=256,  # Embedding dimension
-            nhead=8,  # Number of attention heads
-            num_layers=6,  # Number of transformer layers
-            dim_feedforward=1024,  # Dimension of feedforward network
-            dropout=0.1,  # Dropout rate
-        ).to(device)
+        netD = AlexNet_Discriminator(num_genders + 1).to(device)
+        # netD = TransformerDiscriminator(
+        #     num_classes=num_genders + 1,
+        #     d_model=256,  # Embedding dimension
+        #     nhead=8,  # Number of attention heads
+        #     num_layers=6,  # Number of transformer layers
+        #     dim_feedforward=1024,  # Dimension of feedforward network
+        #     dropout=0.1,  # Dropout rate
+        # ).to(device)
 
         # Optimizers
         optG = torch.optim.Adam(netG.parameters(), args.G_lr, betas=(0.5, 0.99))
@@ -223,7 +223,7 @@ def main():
                 x = x.to(device)
                 x = torch.unsqueeze(x, 1)
                 spectrograms = fft(x)
-                spectrograms, means, stds = preprocess_spectrograms(spectrograms)
+                spectrograms, _, _ = preprocess_spectrograms(spectrograms)
                 spectrograms = torch.unsqueeze(spectrograms, 1)
 
                 # ------------------------

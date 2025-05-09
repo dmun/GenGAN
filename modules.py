@@ -47,9 +47,12 @@ class Audio2Mel(nn.Module):
             fmin=mel_fmin,
             fmax=mel_fmax,
         )
+        self.device = device
         mel_basis = torch.from_numpy(mel_basis).float().to(device)
         self.register_buffer("mel_basis", mel_basis)
         self.register_buffer("window", window)
+        # self.mel_basis = mel_basis
+        # self.window = window
         self.n_fft = n_fft
         self.hop_length = hop_length
         self.win_length = win_length
@@ -57,9 +60,10 @@ class Audio2Mel(nn.Module):
         self.n_mel_channels = n_mel_channels
 
     def forward(self, audio):
-        p = (self.n_fft - self.hop_length) // 2
-        # audio = F.pad(audio, (p, p), "reflect").squeeze(1)
-        audio = F.pad(audio, (p, p), "constant").squeeze(1)
+        total_pad = self.n_fft - self.hop_length
+        pad_left = total_pad // 2
+        pad_right = total_pad - pad_left
+        audio = F.pad(audio, (pad_left, pad_right), "constant").squeeze(1).to(self.device)
 
         fft = torch.stft(
             audio,
@@ -70,6 +74,7 @@ class Audio2Mel(nn.Module):
             center=False,
             return_complex=True,
         )
+
         magnitude = torch.sqrt(fft.real**2 + fft.imag**2)
         mel_output = torch.matmul(self.mel_basis, magnitude)
         log_mel_spec = torch.log10(torch.clamp(mel_output, min=1e-5))
